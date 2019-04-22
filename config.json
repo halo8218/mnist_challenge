@@ -1,6 +1,6 @@
 {
   "_comment": "===== MODEL CONFIGURATION =====",
-  "model_dir": "models/a_very_robust_model",
+  "model_dir": "models/GSOPwh_and_GSOPc",
 
   "_comment": "===== TRAINING CONFIGURATION =====",
   "random_seed": 4557077,
@@ -11,7 +11,7 @@
   "training_batch_size": 50,
 
   "_comment": "===== EVAL CONFIGURATION =====",
-  "num_eval_examples": 10000,
+  "num_eval_examples": 600,
   "eval_batch_size": 200,
   "eval_on_cpu": true,
 

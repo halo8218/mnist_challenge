@@ -20,28 +20,8 @@ from tensorflow.examples.tutorials.mnist import input_data
 import model as md
 from pgd_attack import LinfPGDAttack
 
-if len(sys.argv) != 3 or sys.argv[1] not in ['conv',
-                                             'gsop',
-                                             'se',
-                                             'cse']:
-  print('Usage: python train.py [conv, gsop, se, cse] [latest, all]')
-  sys.exit(1)
-
-if sys.argv[1] == 'conv':
-  conf = 'config_conv.json'
-  model = md.Model()
-elif sys.argv[1] == 'gsop':
-  conf = 'config_gsop.json'
-  model = md.GSOPcModel()
-elif sys.argv[1] == 'se':
-  conf = 'config_se.json'
-  model = md.SEModel()
-else: 
-  conf = 'config_cse.json'
-  model = md.CSEModel()
-
 # Global constants
-with open(conf) as config_file:
+with open('config.json') as config_file:
   config = json.load(config_file)
 num_eval_examples = config['num_eval_examples']
 eval_batch_size = config['eval_batch_size']
@@ -54,15 +34,24 @@ mnist = input_data.read_data_sets('MNIST_data', one_hot=False)
 
 if eval_on_cpu:
   with tf.device("/cpu:0"):
-    #model = Model()
+    #sp_model = md.CompactGSOPwhModel()
+    #model = md.Model()
+    sp_model = md.GSOPcModel()
+    model = md.GSOPwhModel()
     attack = LinfPGDAttack(model, 
                            config['epsilon'],
                            config['k'],
                            config['a'],
                            config['random_start'],
                            config['loss_func'])
+    sp_attack = LinfPGDAttack(sp_model, 
+                           config['epsilon'],
+                           config['k'],
+                           config['a'],
+                           config['random_start'],
+                           config['loss_func'])
 else:
-  #model = Model()
+  model = Model()
   attack = LinfPGDAttack(model, 
                          config['epsilon'],
                          config['k'],
@@ -98,7 +87,14 @@ def evaluate_checkpoint(filename):
     total_corr_nat = 0
     total_corr_adv = 0
 
+    sp_total_xent_nat = 0.
+    sp_total_xent_adv = 0.
+    sp_total_corr_nat = 0
+    sp_total_corr_adv = 0
+
     for ibatch in range(num_batches):
+      print('start iteration....')
+      sys.stdout.flush()
       bstart = ibatch * eval_batch_size
       bend = min(bstart + eval_batch_size, num_eval_examples)
 
@@ -107,28 +103,60 @@ def evaluate_checkpoint(filename):
 
       dict_nat = {model.x_input: x_batch,
                   model.y_input: y_batch}
+      sp_dict_nat = {sp_model.x_input: x_batch,
+                  sp_model.y_input: y_batch}
 
       x_batch_adv = attack.perturb(x_batch, y_batch, sess)
+      sp_x_batch_adv = sp_attack.perturb(x_batch, y_batch, sess)
 
       dict_adv = {model.x_input: x_batch_adv,
                   model.y_input: y_batch}
 
+      sp_dict_adv = {sp_model.x_input: sp_x_batch_adv,
+                  sp_model.y_input: y_batch}
+
+      print('dict finished iteration....')
+      sys.stdout.flush()
       cur_corr_nat, cur_xent_nat = sess.run(
                                       [model.num_correct,model.xent],
                                       feed_dict = dict_nat)
+      print('A iteration....')
+      sys.stdout.flush()
       cur_corr_adv, cur_xent_adv = sess.run(
                                       [model.num_correct,model.xent],
                                       feed_dict = dict_adv)
+      print('B iteration....')
+      sys.stdout.flush()
+      sp_cur_corr_nat, sp_cur_xent_nat = sess.run(
+                                      [sp_model.num_correct,sp_model.xent],
+                                      feed_dict = sp_dict_nat)
+      print('C iteration....')
+      sys.stdout.flush()
+      sp_cur_corr_adv, sp_cur_xent_adv = sess.run(
+                                      [sp_model.num_correct,sp_model.xent],
+                                      feed_dict = sp_dict_adv)
+      print('D iteration....')
+      sys.stdout.flush()
 
       total_xent_nat += cur_xent_nat
       total_xent_adv += cur_xent_adv
       total_corr_nat += cur_corr_nat
       total_corr_adv += cur_corr_adv
 
+      sp_total_xent_nat += sp_cur_xent_nat
+      sp_total_xent_adv += sp_cur_xent_adv
+      sp_total_corr_nat += sp_cur_corr_nat
+      sp_total_corr_adv += sp_cur_corr_adv
+
     avg_xent_nat = total_xent_nat / num_eval_examples
     avg_xent_adv = total_xent_adv / num_eval_examples
     acc_nat = total_corr_nat / num_eval_examples
     acc_adv = total_corr_adv / num_eval_examples
+
+    sp_avg_xent_nat = sp_total_xent_nat / num_eval_examples
+    sp_avg_xent_adv = sp_total_xent_adv / num_eval_examples
+    sp_acc_nat = sp_total_corr_nat / num_eval_examples
+    sp_acc_adv = sp_total_corr_adv / num_eval_examples
 
     summary = tf.Summary(value=[
           tf.Summary.Value(tag='xent adv eval', simple_value= avg_xent_adv),
@@ -136,54 +164,53 @@ def evaluate_checkpoint(filename):
           tf.Summary.Value(tag='xent nat', simple_value= avg_xent_nat),
           tf.Summary.Value(tag='accuracy adv eval', simple_value= acc_adv),
           tf.Summary.Value(tag='accuracy adv', simple_value= acc_adv),
-          tf.Summary.Value(tag='accuracy nat', simple_value= acc_nat)])
+          tf.Summary.Value(tag='accuracy nat', simple_value= acc_nat),
+          tf.Summary.Value(tag='sp xent adv eval', simple_value= sp_avg_xent_adv),
+          tf.Summary.Value(tag='sp xent adv', simple_value= sp_avg_xent_adv),
+          tf.Summary.Value(tag='sp xent nat', simple_value= sp_avg_xent_nat),
+          tf.Summary.Value(tag='sp accuracy adv eval', simple_value= sp_acc_adv),
+          tf.Summary.Value(tag='sp accuracy adv', simple_value= sp_acc_adv),
+          tf.Summary.Value(tag='sp accuracy nat', simple_value= sp_acc_nat)])
     summary_writer.add_summary(summary, global_step.eval(sess))
 
     print('natural: {:.2f}%'.format(100 * acc_nat))
     print('adversarial: {:.2f}%'.format(100 * acc_adv))
     print('avg nat loss: {:.4f}'.format(avg_xent_nat))
     print('avg adv loss: {:.4f}'.format(avg_xent_adv))
+    print('sp natural: {:.2f}%'.format(100 * sp_acc_nat))
+    print('sp adversarial: {:.2f}%'.format(100 * sp_acc_adv))
+    print('sp avg nat loss: {:.4f}'.format(sp_avg_xent_nat))
+    print('sp avg adv loss: {:.4f}'.format(sp_avg_xent_adv))
 
-if sys.argv[2]=='latest':
-  # Infinite eval loop
-  while True:
-    cur_checkpoint = tf.train.latest_checkpoint(model_dir)
-  
-    # Case 1: No checkpoint yet
-    if cur_checkpoint is None:
-      if not already_seen_state:
-        print('No checkpoint yet, waiting ...', end='')
-        already_seen_state = True
-      else:
-        print('.', end='')
-      sys.stdout.flush()
-      time.sleep(10)
-    # Case 2: Previously unseen checkpoint
-    elif cur_checkpoint != last_checkpoint_filename:
-      print('\nCheckpoint {}, evaluating ...   ({})'.format(cur_checkpoint,
-                                                            datetime.now()))
-      sys.stdout.flush()
-      last_checkpoint_filename = cur_checkpoint
-      already_seen_state = False
-      evaluate_checkpoint(cur_checkpoint)
-    # Case 3: Previously evaluated checkpoint
+# Infinite eval loop
+while True:
+  cur_checkpoint = tf.train.latest_checkpoint(model_dir)
+
+  # Case 1: No checkpoint yet
+  if cur_checkpoint is None:
+    if not already_seen_state:
+      print('No checkpoint yet, waiting ...', end='')
+      already_seen_state = True
     else:
-      if not already_seen_state:
-        print('Waiting for the next checkpoint ...   ({})   '.format(
-              datetime.now()),
-              end='')
-        already_seen_state = True
-      else:
-        print('.', end='')
-      sys.stdout.flush()
-      time.sleep(10)
-elif sys.argv[2]=='all':
-  ckpt_state = tf.train.get_checkpoint_state(model_dir)
-  ckpt_list = ckpt_state.all_model_checkpoint_paths
-  for cur_checkpoint in ckpt_list:
-      print('\nCheckpoint {}, evaluating ...   ({})'.format(cur_checkpoint,
-                                                            datetime.now()))
-      sys.stdout.flush()
-      evaluate_checkpoint(cur_checkpoint)
-else:
-  print('Use 2nd argv in [latest, all]')  
+      print('.', end='')
+    sys.stdout.flush()
+    time.sleep(10)
+  # Case 2: Previously unseen checkpoint
+  elif cur_checkpoint != last_checkpoint_filename:
+    print('\nCheckpoint {}, evaluating ...   ({})'.format(cur_checkpoint,
+                                                          datetime.now()))
+    sys.stdout.flush()
+    last_checkpoint_filename = cur_checkpoint
+    already_seen_state = False
+    evaluate_checkpoint(cur_checkpoint)
+  # Case 3: Previously evaluated checkpoint
+  else:
+    if not already_seen_state:
+      print('Waiting for the next checkpoint ...   ({})   '.format(
+            datetime.now()),
+            end='')
+      already_seen_state = True
+    else:
+      print('.', end='')
+    sys.stdout.flush()
+    time.sleep(10)
