@@ -11,7 +11,7 @@ models
 # compiled python files
 *.pyc
 
-*.json
+#*.json
 *.log
 *.out
 *.sh

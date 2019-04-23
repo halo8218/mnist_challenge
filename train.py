@@ -19,12 +19,23 @@ from tensorflow.examples.tutorials.mnist import input_data
 import model as md
 from pgd_attack import LinfPGDAttack
 
-if len(sys.argv) != 2 or sys.argv[1] not in ['conv',
+if len(sys.argv) < 2 or sys.argv[1] not in ['conv',
                                              'gsop',
                                              'se',
-                                             'cse']:
-  print('Usage: python train.py [conv, gsop, se, cse]')
+                                             'new1rs',
+                                             'new1ts',
+                                             'new1ss',
+                                             'new2rs',
+                                             'new2ts',
+                                             'new2ss',
+                                             'new3ts',
+                                             'new3ss']:
+  print('Usage: python train.py [conv, gsop, se, {many of new}]')
   sys.exit(1)
+
+prefix=''
+if len(sys.argv)==3:
+  prefix = sys.argv[2]
 
 if sys.argv[1] == 'conv':
   conf = 'config_conv.json'
@@ -35,9 +46,30 @@ elif sys.argv[1] == 'gsop':
 elif sys.argv[1] == 'se':
   conf = 'config_se.json'
   model = md.SEModel()
+elif sys.argv[1] == 'new1rs':
+  conf = 'config_new1rs.json'
+  model = md.NewModel_1rs()
+elif sys.argv[1] == 'new1ts':
+  conf = 'config_new1ts.json'
+  model = md.NewModel_1ts()
+elif sys.argv[1] == 'new1ss':
+  conf = 'config_new1ss.json'
+  model = md.NewModel_1ss()
+elif sys.argv[1] == 'new2rs':
+  conf = 'config_new2rs.json'
+  model = md.NewModel_2rs()
+elif sys.argv[1] == 'new2ts':
+  conf = 'config_new2ts.json'
+  model = md.NewModel_2ts()
+elif sys.argv[1] == 'new2ss':
+  conf = 'config_new2ss.json'
+  model = md.NewModel_2ss()
+elif sys.argv[1] == 'new3ts':
+  conf = 'config_new3ts.json'
+  model = md.NewModel_3ts()
 else: 
-  conf = 'config_cse.json'
-  model = md.CSEModel()
+  conf = 'config_new3ss.json'
+  model = md.NewModel_3ss()
 
 with open(conf) as config_file:
     config = json.load(config_file)
@@ -71,7 +103,7 @@ attack = LinfPGDAttack(model,
                        config['loss_func'])
 
 # Setting up the Tensorboard and checkpoint outputs
-model_dir = config['model_dir']
+model_dir = config['model_dir']+prefix
 if not os.path.exists(model_dir):
   os.makedirs(model_dir)
 
@@ -87,7 +119,7 @@ tf.summary.scalar('accuracy adv train', model.accuracy)
 #tf.summary.scalar('xent adv', model.xent / batch_size)
 #tf.summary.image('images adv train', model.x_image)
 tf.summary.image('images nat train', model.nat_test_img)
-tf.summary.image('images nat train', model.adv_test_img)
+#tf.summary.image('images nat train', model.adv_test_img)
 merged_summaries = tf.summary.merge_all()
 valid_summary = tf.summary.scalar('accuracy adv valid', model.accuracy)
 
@@ -106,7 +138,7 @@ with tf.Session() as sess:
     # Compute Adversarial Perturbations
     start = timer()
     x_batch_adv = attack.perturb(x_batch, y_batch, sess)
-    adv_test = attack.perturb(x_batch, y_batch, sess, False)
+    #adv_test = attack.perturb(x_batch, y_batch, sess, False)
     end = timer()
     training_time += end - start
 
@@ -118,8 +150,8 @@ with tf.Session() as sess:
 
     summary_dict = {model.x_input: x_batch_adv,
                     model.y_input: y_batch,
-                    model.nat_test_input: x_batch,
-                    model.adv_test_input: adv_test}
+                    model.nat_test_input: x_batch}
+                    #model.adv_test_input: adv_test}
 
     # Output to stdout
     if ii % num_output_steps == 0:

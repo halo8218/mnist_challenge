@@ -1,0 +1,27 @@
+{
+  "_comment": "===== MODEL CONFIGURATION =====",
+  "model_dir": "models/new3ts",
+
+  "_comment": "===== TRAINING CONFIGURATION =====",
+  "random_seed": 7311060,
+  "max_num_training_steps": 50000,
+  "optimizer": "adam",
+  "step_size": 1e-4,
+  "num_output_steps": 128,
+  "num_summary_steps": 128,
+  "num_checkpoint_steps": 300,
+  "training_batch_size": 128,
+
+  "_comment": "===== EVAL CONFIGURATION =====",
+  "num_eval_examples": 10000,
+  "eval_batch_size": 200,
+  "eval_on_cpu": false,
+
+  "_comment": "=====ADVERSARIAL EXAMPLES CONFIGURATION=====",
+  "epsilon": 0.3,
+  "k": 40,
+  "a": 0.01,
+  "random_start": true,
+  "loss_func": "xent",
+  "store_adv_path": "fgsm_k.npy"
+}
