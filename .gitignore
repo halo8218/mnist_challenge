@@ -14,4 +14,4 @@ models
 #*.json
 *.log
 *.out
-*.sh
+#*.sh
